@@ -90,7 +90,7 @@ I also tried to make it as **generic** and **reusable** as possible to cover mos
   - Support for a range of foundational and embedding models (DeepSeek, Llama, Mistral, Sentence Transformers, etc.) via LangChain, Together.AI, and Hugging Face
 - **API Examples**
   - **Backoffice:** Lob (USPS Mail), Paypal, Quickbooks, Stripe, Twilio (text messaging)
-  - **Data, Media & Entertainment:** Alpha Vantage (stocks and finance info) with ChartJS, Github, Foursquare, Last.fm, New York Times, PubChem (chemical information), Trakt.tv (movies/TV), Twitch, Tumblr (OAuth 1.0a example), Web Scraping
+  - **Data, Media & Entertainment:** Alpha Vantage (stocks and finance info) with ChartJS, Github, Foursquare, Last.fm, New York Times, PubChem (chemical information), Trakt.tv (movies/TV), Twitch, Tumblr (OAuth 1.0a example), Web Scraping, Wikipedia
   - **Maps and Location:** Google Maps, HERE Maps
   - **Productivity:** Google Drive, Google Sheets
 
@@ -1360,25 +1360,209 @@ User.aggregate({ $group: { _id: null, total: { $sum: '$votes' } } }, (err, votes
 
 ## Docker
 
-You will need to install docker and docker-compose on your system. If you are using WSL, you will need to install Docker Desktop on Windows and docker-compose on WSL.
+This section provides complete instructions for running Hackathon Starter using Docker, including setting up OAuth providers and HTTPS for secure authentication.
 
-- [Docker installation](https://docs.docker.com/engine/installation/)
+### Prerequisites
 
-After installing docker, start the application with the following commands :
+- [Docker](https://docs.docker.com/engine/installation/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- For OAuth providers (GitHub, Facebook, etc.), you'll need HTTPS. We'll use [ngrok](https://ngrok.com/) for local development
+- API credentials for the services you want to use
 
+### Quick Start
+
+1. **Clone and navigate to the project:**
+   ```bash
+   git clone https://github.com/sahat/hackathon-starter.git myproject
+   cd myproject
+   ```
+
+2. **Create environment file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Build and start the application:**
+   ```bash
+   # Build the Docker image
+   docker-compose build web
+   
+   # Start the application
+   docker-compose up web
+   ```
+
+4. **Access the application:**
+   - Open your browser to `http://localhost:8080`
+
+### Complete Setup with OAuth Providers
+
+For full functionality including social login (GitHub, Facebook, etc.), follow these steps:
+
+#### Step 1: Set up HTTPS with ngrok
+
+OAuth providers require HTTPS for security. We'll use ngrok to create a secure tunnel:
+
+1. **Install ngrok:**
+   - Download from [ngrok.com](https://ngrok.com/download)
+   - Or install via package manager: `brew install ngrok` (macOS) or `choco install ngrok` (Windows)
+
+2. **Start ngrok tunnel:**
+   ```bash
+   ngrok http 8080
+   ```
+   
+3. **Copy your ngrok URL:**
+   - Note the HTTPS URL (e.g., `https://abc123.ngrok-free.app`)
+   - This will be your `BASE_URL` for OAuth callbacks
+
+#### Step 2: Configure Environment Variables
+
+Edit your `.env` file with the following variables:
+
+```bash
+# Database
+MONGODB_URI=mongodb://mongo:27017/test
+
+# Application
+BASE_URL=https://your-ngrok-url.ngrok-free.app
+SESSION_SECRET=your-super-secret-session-key-here
+
+# SMTP (for email functionality)
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+
+# GitHub OAuth (example)
+GITHUB_ID=your-github-client-id
+GITHUB_SECRET=your-github-client-secret
+
+# Facebook OAuth (example)
+FACEBOOK_ID=your-facebook-app-id
+FACEBOOK_SECRET=your-facebook-app-secret
+
+# Google OAuth (example)
+GOOGLE_ID=your-google-client-id
+GOOGLE_SECRET=your-google-client-secret
 ```
-# To build the project while suppressing most of the build messages
+
+#### Step 3: Set up OAuth Providers
+
+**GitHub OAuth Setup:**
+
+1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
+2. Click "New OAuth App"
+3. Fill in:
+   - **Application name:** Your App Name
+   - **Homepage URL:** `https://your-ngrok-url.ngrok-free.app`
+   - **Authorization callback URL:** `https://your-ngrok-url.ngrok-free.app/auth/github/callback`
+4. Copy Client ID and Client Secret to your `.env` file
+
+**Facebook OAuth Setup:**
+
+1. Go to [Facebook Developers](https://developers.facebook.com/)
+2. Create a new app
+3. Add Facebook Login product
+4. In Facebook Login settings:
+   - **Valid OAuth Redirect URIs:** `https://your-ngrok-url.ngrok-free.app/auth/facebook/callback`
+5. Copy App ID and App Secret to your `.env` file
+
+#### Step 4: Start the Application
+
+1. **Start ngrok in one terminal:**
+   ```bash
+   ngrok http 8080
+   ```
+
+2. **Update your .env file** with the ngrok URL from step 1
+
+3. **Start the application:**
+   ```bash
+   docker-compose up web
+   ```
+
+4. **Access your application:**
+   - Use the HTTPS ngrok URL (e.g., `https://abc123.ngrok-free.app`)
+   - **Important:** Always use the HTTPS ngrok URL, not `localhost:8080`
+
+### Docker Commands Reference
+
+```bash
+# Build the project (first time or after code changes)
 docker-compose build web
 
-# To build the project without suppressing the build messages or using cached data
+# Build without cache (if you encounter issues)
 docker-compose build --no-cache --progress=plain web
 
-# To start the application (or to restart after making changes to the source code)
+# Start the application
 docker-compose up web
 
+# Start in background (detached mode)
+docker-compose up -d web
+
+# View logs
+docker-compose logs web
+
+# Stop the application
+docker-compose down
+
+# Rebuild and restart after code changes
+docker-compose down && docker-compose build web && docker-compose up web
 ```
 
-To view the app, find your docker IP address + port 8080 ( this will typically be `http://localhost:8080/` ). To use a port other than 8080, you would need to modify the port in app.js, Dockerfile, and docker-compose.yml.
+### Troubleshooting
+
+**Common Issues:**
+
+1. **"MongoDB connection error":**
+   - Ensure MongoDB container is running: `docker-compose ps`
+   - Check if mongo service is healthy: `docker-compose logs mongo`
+
+2. **OAuth redirect errors:**
+   - Verify your `BASE_URL` in `.env` matches your ngrok URL exactly
+   - Ensure you're using HTTPS ngrok URL, not localhost
+   - Check that OAuth provider callback URLs match your ngrok URL
+
+3. **"Cannot find module" errors:**
+   - Rebuild the Docker image: `docker-compose build --no-cache web`
+
+4. **Port already in use:**
+   - Change the port in `docker-compose.yml` and `app.js`
+   - Or stop other services using port 8080
+
+5. **ngrok tunnel issues:**
+   - Restart ngrok: `ngrok http 8080`
+   - Update your `.env` file with the new ngrok URL
+   - Update OAuth provider callback URLs
+
+**Useful Docker Commands:**
+
+```bash
+# View running containers
+docker ps
+
+# View all containers (including stopped)
+docker ps -a
+
+# Remove all containers and images
+docker-compose down --rmi all
+
+# Access container shell for debugging
+docker-compose exec web bash
+
+# View container logs
+docker-compose logs -f web
+```
+
+### Production Considerations
+
+For production deployment:
+
+1. **Use a proper domain** instead of ngrok
+2. **Set up SSL certificates** (Let's Encrypt, etc.)
+3. **Use environment-specific configuration**
+4. **Set up proper MongoDB Atlas** instead of local MongoDB
+5. **Configure proper security headers**
+
+The Docker setup is primarily intended for development and testing. For production, consider using a proper hosting platform with managed databases and SSL certificates.
 
 ## Deployment
 
